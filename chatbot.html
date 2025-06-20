@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creative Construction Chatbot</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for minimize/maximize icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" xintegrity="sha512-Fo3rlroqQ7iN+R0g0M5o1T+4pC7+t+7F8LpU0p2p7Ff+1F8g0j0R7+7g9+0k0p9+0R7+7Q8/2B0/6A7+7T/2R7w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+            /* Ensure the body takes full height of the iframe */
+            height: 100%;
+            margin: 0;
+            display: flex;
+            align-items: flex-end; /* Align chatbot to bottom right within iframe */
+            justify-content: flex-end;
+            padding: 1rem; /* Padding from iframe edges */
+        }
+        /* Adjusted main container for fixed position within body for minimize effect */
+        .chat-widget {
+            background-color: white;
+            border-radius: 0.75rem; /* Rounded corners */
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); /* Stronger shadow for floating effect */
+            display: flex;
+            flex-direction: column;
+            width: 100%; /* Take full width of its parent (max-w-2xl if body centered, or specific width if body right-aligned) */
+            height: 100%; /* Take full height of its parent (body) initially */
+            max-width: 400px; /* Standard chatbot width */
+            transition: height 0.3s ease-in-out, transform 0.3s ease-in-out; /* Smooth transition for minimize */
+            overflow: hidden; /* Hide overflow when minimized */
+        }
+
+        .chat-widget.minimized {
+            height: 56px; /* Height of just the header */
+            border-bottom-left-radius: 0.75rem; /* Maintain rounded corners when minimized */
+            border-bottom-right-radius: 0.75rem;
+        }
+
+        .chat-container {
+            flex-grow: 1; /* Allow messages to take available height */
+            overflow-y: auto; /* Enable scrolling */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            scrollbar-width: thin; /* Firefox */
+            scrollbar-color: #9ca3af #e5e7eb; /* Firefox scrollbar color */
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Custom scrollbar for Webkit browsers */
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background: #e5e7eb; /* Lighter track */
+            border-radius: 10px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background-color: #9ca3af; /* Gray thumb */
+            border-radius: 10px;
+            border: 2px solid #e5e7eb;
+        }
+        .message-bubble {
+            max-width: 80%;
+            border-radius: 0.75rem; /* Rounded corners */
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); /* Subtle shadow */
+        }
+        .user-bubble {
+            background-color: #3b82f6; /* Blue 500 */
+            color: white;
+            align-self: flex-end; /* Align to right */
+            margin-left: auto;
+        }
+        .bot-bubble {
+            background-color: #e5e7eb; /* Gray 200 */
+            color: #1f2937; /* Dark gray text */
+            align-self: flex-start; /* Align to left */
+            margin-right: auto;
+        }
+
+        /* Styles for the custom alert message box */
+        .alert-message-box {
+            position: fixed;
+            inset: 0; /* Covers the whole screen */
+            background-color: rgba(0, 0, 0, 0.75); /* Dark semi-transparent overlay */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            z-index: 1000; /* Ensure it's on top */
+        }
+        .alert-content {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 24rem; /* Max width for readability */
+            width: 100%;
+        }
+        .alert-content button {
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .alert-content button:hover {
+            background-color: #2563eb;
+        }
+
+        /* Service button styling */
+        .service-button {
+            @apply bg-blue-100 text-blue-800 py-3 px-5 rounded-lg font-medium cursor-pointer transition-colors duration-200 hover:bg-blue-200;
+            margin-bottom: 0.75rem;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body class="flex items-end justify-end w-full h-full p-4">
+    <div id="chat-widget" class="chat-widget">
+        <!-- Chat Header -->
+        <div class="p-4 bg-blue-600 text-white rounded-t-lg flex items-center justify-between shadow-md">
+            <h1 class="text-xl font-semibold">Creative Construction Bot</h1>
+            <button id="minimize-button" class="text-white text-lg focus:outline-none hover:text-blue-200 transition-colors duration-200">
+                <i class="fas fa-minus"></i> <!-- Minus icon for minimize -->
+            </button>
+        </div>
+
+        <!-- Chat Content Area (messages and input) -->
+        <div id="chat-content" class="flex-1 flex flex-col">
+            <!-- Chat Messages Container -->
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto chat-container flex flex-col">
+                <!-- Initial Bot Message - hidden until service selected -->
+                <div class="message-bubble bot-bubble" id="initial-bot-message">
+                    Hello! Welcome to Creative Construction. How can I assist you with your innovative building and design ideas today?
+                </div>
+                <!-- Service selection will be displayed here initially -->
+                <div id="service-selection-container" class="flex flex-col items-center justify-center p-4">
+                    <p class="text-gray-700 text-lg mb-4 text-center">Please select a service you're interested in:</p>
+                    <div id="service-buttons-container" class="w-full max-w-sm">
+                        <!-- Service buttons will be injected here by JavaScript -->
+                    </div>
+                </div>
+                <!-- Chat messages will be appended here by JavaScript -->
+            </div>
+
+            <!-- Chat Input Area -->
+            <div id="chat-input-area" class="p-4 border-t border-gray-200 bg-white flex items-center rounded-b-lg hidden">
+                <input type="text" id="user-input" placeholder="Ask about designs, materials, services..."
+                       class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mr-2 text-gray-800">
+                <button id="send-button"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Send
+                </button>
+                <div id="loading-indicator" class="ml-4 text-blue-600 animate-pulse hidden">
+                    <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Alert Message Box -->
+    <div id="alert-message-box" class="alert-message-box hidden">
+        <div class="alert-content">
+            <p id="alert-message-text" class="text-gray-800 text-lg mb-4"></p>
+            <button id="alert-ok-button">OK</button>
+        </div>
+    </div>
+
+    <script>
+        const chatWidget = document.getElementById('chat-widget');
+        const chatContent = document.getElementById('chat-content');
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const alertMessageBox = document.getElementById('alert-message-box');
+        const alertMessageText = document.getElementById('alert-message-text');
+        const alertOkButton = document.getElementById('alert-ok-button');
+        const serviceSelectionContainer = document.getElementById('service-selection-container');
+        const serviceButtonsContainer = document.getElementById('service-buttons-container');
+        const chatInputArea = document.getElementById('chat-input-area');
+        const initialBotMessage = document.getElementById('initial-bot-message');
+        const minimizeButton = document.getElementById('minimize-button');
+
+        let chatHistory = []; // Stores conversation history for LLM context
+        let userTurnCount = 0; // Tracks the number of user messages sent AFTER service selection
+        const MAX_FREE_CHAT_TURNS = 3; // Number of initial free chat turns before asking for contact
+        let awaitingContactDetails = false; // Flag to indicate bot is waiting for user's contact details
+
+        // Define your services based on creativeconstructions.netlify.app
+        const services = [
+            "Contract Works",
+            "Architectural Planning",
+            "Plan Approvals (VUDA)",
+            "Structural Designs",
+            "AutoCAD Drawings",
+            "Property Valuations"
+        ];
+
+        // Function to display a custom alert message
+        function showAlert(message) {
+            alertMessageText.textContent = message;
+            alertMessageBox.classList.remove('hidden');
+        }
+
+        // Event listener for the custom alert's OK button
+        alertOkButton.addEventListener('click', () => {
+            alertMessageBox.classList.add('hidden');
+        });
+
+        // Function to add a message bubble to the chat display
+        function addMessage(message, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message-bubble');
+            if (sender === 'user') {
+                messageDiv.classList.add('user-bubble');
+            } else {
+                messageDiv.classList.add('bot-bubble');
+            }
+            messageDiv.innerHTML = message; // Use innerHTML to allow for bold text
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+        }
+
+        // Function to display service options
+        function displayServices() {
+            // Hide the initial bot message bubble until a service is chosen
+            initialBotMessage.classList.add('hidden');
+            chatInputArea.classList.add('hidden'); // Hide input area initially
+
+            services.forEach(service => {
+                const button = document.createElement('button');
+                button.textContent = service;
+                button.classList.add('service-button');
+                button.addEventListener('click', () => handleServiceSelection(service));
+                serviceButtonsContainer.appendChild(button);
+            });
+            serviceSelectionContainer.classList.remove('hidden');
+        }
+
+        // Handle service button click
+        async function handleServiceSelection(serviceName) {
+            serviceSelectionContainer.classList.add('hidden'); // Hide service options
+            initialBotMessage.classList.remove('hidden'); // Show initial bot message
+            chatInputArea.classList.remove('hidden'); // Show chat input area
+
+            addMessage(`I'm interested in ${serviceName}.`, 'user');
+
+            // Simulate the first user message for the LLM
+            userTurnCount = 0; // Reset for accurate turn counting after service selection
+            awaitingContactDetails = false; // Ensure this is reset
+
+            // Automatically send the selected service to the bot
+            await sendToBot(serviceName, true); // true to indicate initial service query
+        }
+
+        // Function to send message to bot (internal helper)
+        async function sendToBot(message, isInitialServiceQuery = false) {
+            loadingIndicator.classList.remove('hidden');
+            sendButton.disabled = true;
+
+            // Add user message to chat history for LLM context
+            chatHistory.push({ role: "user", parts: [{ text: message }] });
+
+            const payload = { contents: chatHistory };
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const botResponse = result.candidates[0].content.parts[0].text;
+                    addMessage(botResponse, 'bot');
+                    chatHistory.push({ role: "model", parts: [{ text: botResponse }] });
+
+                    // Increment user turn count only for actual user messages after initial service selection
+                    if (!isInitialServiceQuery) {
+                       userTurnCount++;
+                    }
+
+                    // Check if it's time to ask for contact details
+                    if (userTurnCount >= MAX_FREE_CHAT_TURNS && !awaitingContactDetails) {
+                        const contactRequestMessage = "I hope I've been helpful so far! To get more personalized assistance and have someone from our team contact you, please provide your **Full Name, Email Address, and Phone Number**. We'll be in touch shortly!";
+                        addMessage(contactRequestMessage, 'bot');
+                        awaitingContactDetails = true;
+                        userInput.placeholder = "Enter your Full Name, Email, and Phone Number...";
+                        sendButton.textContent = "Submit Details";
+                    }
+
+                } else {
+                    addMessage("Sorry, I couldn't get a response from the AI. Please try again.", 'bot');
+                    chatHistory.pop(); // Remove last user message on AI failure
+                }
+            } catch (error) {
+                console.error("Error communicating with Gemini API:", error);
+                addMessage("Oops! Something went wrong. Please check your network connection or try again later.", 'bot');
+                chatHistory.pop(); // Remove last user message on API call failure
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                sendButton.disabled = false;
+            }
+        }
+
+        // Function to handle sending messages (main entry point for user input)
+        async function sendMessage() {
+            const userMessage = userInput.value.trim();
+            if (userMessage === '') {
+                showAlert("Please type a message.");
+                return;
+            }
+
+            addMessage(userMessage, 'user');
+            userInput.value = '';
+
+            if (awaitingContactDetails) {
+                const contactDetails = userMessage;
+                console.log("Customer Details:", contactDetails);
+
+                await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing
+
+                const finalMessage = "Thank you for providing your details! Someone from our Creative Construction team will contact you soon. We appreciate your interest and look forward to building your ideas!";
+                addMessage(finalMessage, 'bot');
+
+                userInput.disabled = true;
+                sendButton.disabled = true;
+                userInput.placeholder = "Conversation ended. Refresh to start a new chat.";
+                loadingIndicator.classList.add('hidden');
+                return;
+            }
+
+            await sendToBot(userMessage);
+        }
+
+        // Toggle minimize/maximize
+        minimizeButton.addEventListener('click', () => {
+            chatWidget.classList.toggle('minimized');
+            const icon = minimizeButton.querySelector('i');
+            if (chatWidget.classList.contains('minimized')) {
+                icon.classList.remove('fa-minus');
+                icon.classList.add('fa-plus'); // Change to plus icon when minimized
+                chatContent.style.display = 'none'; // Hide content when minimized
+            } else {
+                icon.classList.remove('fa-plus');
+                icon.classList.add('fa-minus'); // Change back to minus icon
+                chatContent.style.display = 'flex'; // Show content when maximized
+            }
+        });
+
+
+        // Initialize by displaying services
+        document.addEventListener('DOMContentLoaded', displayServices);
+
+        // Event Listeners for Send button and Enter key
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
